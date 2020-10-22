@@ -6,7 +6,7 @@
 #define STR_LEN 100
 
 
-void run_cmds(char* buf) {
+int run_cmds(char* buf) {
     char s[STR_LEN];
     char** res = NULL;
     int num =0;
@@ -64,12 +64,14 @@ void run_cmds(char* buf) {
         wait(&t);
     }
     free(res);
+    return 0;
 }
 
 void user_loop() {
     char *buf = malloc(sizeof(char[STR_LEN]));
     int num = 0;
     int idx = 0;
+    int r;
     while(1)  {
         printf(">");
         fgets(buf, STR_LEN, stdin);
@@ -77,7 +79,9 @@ void user_loop() {
             fprintf(stderr, "Unable to get command line \n");
             exit(1);
         }
-        run_cmds(buf);
+        r = run_cmds(buf);
+        if(r == -1)
+            exit(1);
     }
 }
 
