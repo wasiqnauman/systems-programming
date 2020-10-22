@@ -6,42 +6,70 @@
 #define STR_LEN 100
 
 
-char* make_arr(char* buf) {
+void run_cmds(char* buf) {
     char s[STR_LEN];
     char** res = NULL;
     int num =0;
     int idx = 0;
+    char* ext = "exit";
+    char* ech = "echo";
+    char* cmd;
+    int i;
+    int t;
+    pid_t p;
     strcpy(s, buf);
-    char* c = strtok(s, " ");
+    char* c = strtok(s, " \n");
     num++;
 
     while(c != NULL) {
-        if(strcmp(c, "\n")==0) {
-            printf("New Line character detected!\n");
-            c = strtok(NULL, " ");
-            printf("New char is %s", c);
-        }
         res = realloc(res, sizeof(char*) * num);
         if(res == NULL) {
             fprintf(stderr, "Failed to allocate memory for array \n");
             exit(1);
         }   
         res[idx++] = c;
-        c = strtok(NULL, " ");
+        c = strtok(NULL, " \n");
         num++;
     }
     res = realloc(res, sizeof(char*) * num);
     res[idx] = NULL;
-
-    for(int i=0; i< num; i++) {
-        printf("\"%s\"\n", res[i]);
+    cmd = res[0];
+    // check the first words of the command line
+    // if the command is exit
+    if(strcmp(cmd,ext)==0) {
+        printf("Exiting!\n");
+        exit(1);
     }
+    // if the command is echo
+    if(strcmp(cmd,ech)==0) {
+        i=1;
+        while(res[i] != NULL) {
+            printf("%s ",res[i]);
+            i += 1;
+        }
+        printf("\n");
+    }
+    // if the command is something else
+    else {
+        p = fork();
+        if(p < 0) {
+            fprintf(stderr, "Unable to fork\n");
+            exit(1);
+        }
+        if(p == 0) {
+            // child process running
+            execvp(cmd, res);
+            fprintf(stderr, "Unable to run command\n");
+        }
+        wait(&t);
+    }
+    free(res);
 }
+
 void user_loop() {
     char *buf = malloc(sizeof(char[STR_LEN]));
     int num = 0;
     int idx = 0;
-    char* arr;
     while(1)  {
         printf(">");
         fgets(buf, STR_LEN, stdin);
@@ -49,9 +77,7 @@ void user_loop() {
             fprintf(stderr, "Unable to get command line \n");
             exit(1);
         }
-        arr = make_arr(buf);
-        
-
+        run_cmds(buf);
     }
 }
 
