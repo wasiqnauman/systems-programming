@@ -33,6 +33,8 @@ int run_cmds(char* buf) {
     }
     res = realloc(res, sizeof(char*) * num);
     res[idx] = NULL;
+    if(res == NULL || res[0] == NULL)
+        return 0;
     cmd = res[0];
     // check the first words of the command line
     // if the command is exit
