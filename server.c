@@ -12,7 +12,8 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Please provide a port number\n");
         exit(1);
     }
-    int port_number = argv[2];
+    int port_number = atol(argv[1]);
+    printf("Starting server on port: %d\n", port_number);
     // create the main socket
     int main_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(main_socket < 0) {
