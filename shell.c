@@ -62,6 +62,7 @@ int run_cmds(char* buf) {
             // child process running
             execvp(cmd, res);
             fprintf(stderr, "Unable to run command\n");
+            return 0;
         }
         wait(&t);
     }
