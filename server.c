@@ -6,7 +6,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <poll.h>
+
 extern int errno;
+
 int main(int argc, char* argv[]) {
     if(argc < 2) {
         fprintf(stderr, "Please provide a port number\n");
@@ -59,10 +62,27 @@ int main(int argc, char* argv[]) {
         FILE* w_connection = fdopen(session_socket, "w");
         
         fprintf(w_connection, "Hello [%s] welcome to my server!\n", who);
+        printf("Accepted connection-%d from [%s]\n", num_session, who);
+        struct pollfd p[2];
 
-        fflush(w_connection);
-        fclose(w_connection);
-        fclose(r_connection);
-        close(session_socket);
+        p[0].fd = session_socket;
+        p[0].events = POLLRDNORM;
+        p[0].revents = 0;
+        p[1].fd = stdin;
+        p[1].events = POLLRDNORM;
+        p[1].revents = 0;
+        poll(p,2,0);
+        char msg[100];
+        char client_msg[100];
+        if(p[0].revents & POLLRDNORM) {
+            fgets(msg, 100, r_connection);
+            printf("Message from client: [%s]\n", msg);
+        }
+        if(p[1].revents & POLLRDNORM) {
+            fgets(client_msg, 100, stdin);
+            fprintf(w_connection, "Message from server: [%s]\n", client_msg);
+        }
+
+        
     }
 }
