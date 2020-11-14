@@ -11,5 +11,5 @@ example: `./runserver 1234` would start the server on localhost:1234.
 
 
 ## Shell:  
-Compile: `cc -o shell shell.c`. 
+Compile: `cc -o shell shell.c`.  
 Run: `./shell`
