@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 
     char* buf[1000];
     while(1) {
-        char* s = fget(buf, 1000, r_connection);
+        char* s = fgets(buf, 1000, r_connection);
         if(s == NULL) {
             printf("Disconnected\n");
             break;

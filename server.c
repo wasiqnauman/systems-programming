@@ -68,5 +68,7 @@ int main(int argc, char* argv[]) {
         fflush(w_connection);
         fclose(w_connection);
         fclose(r_connection);
+        close(session_socket);
+        printf("Closed session[%d] from [%s] \n", num_session, who);
     }
 }
