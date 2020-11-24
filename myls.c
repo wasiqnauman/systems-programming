@@ -6,17 +6,41 @@
 #include <sys/stat.h>
 
 
+
+
+struct node {
+    struct dirent* dir_entry;
+    struct stat* info;
+};
+
 char* get_type(char d_type) {
     if(d_type == DT_DIR)
         return "D";
     if(d_type == DT_REG)
         return "F";
 }
+void print_info(struct stat* info, char* s) {
+    if(strchr(s,'s') != NULL)
+        printf("size: %d\n", info->st_size);
+    if(strchr(s,'o'))
+        printf("owner: %d\n", info->st_uid);
+    if(strchr(s,'i'))
+        printf("inode: %d\n", info->st_ino);
+}
+
 void run_ls(int argc, char* argv[]) {
-    struct stat buf;
+    struct stat* buf = malloc(sizeof(struct stat));
     char* name = malloc(sizeof(char[100]));
+    char* args = malloc(sizeof(char[100]));
     if(argc >= 2) {
-        strcpy(name, argv[1]);
+        if(strchr(argv[1], '-'))
+            args = strtok(argv[1], "-");
+        else {
+            strcpy(name, argv[1]);
+            args = strtok(argv[2], "-");
+            printf("%s\n", args);
+            
+        }
     }
     else
         strcpy(name, ".");
@@ -27,20 +51,21 @@ void run_ls(int argc, char* argv[]) {
     }
     struct dirent* entry;
     while((entry = readdir(dir)) != NULL){
-        stat(entry->d_name, &buf);
+        stat(entry->d_name, buf);
         char type[100];
         //char* type = get_type(entry->d_type);
-        if(S_ISDIR(buf.st_mode))
+        if(S_ISDIR(buf->st_mode))
             strcpy(type, "D");
-        if(S_ISREG(buf.st_mode))
+        if(S_ISREG(buf->st_mode))
             strcpy(type, "F");
         printf("%s: %s\n",type, entry->d_name);
+        print_info(buf, args);
     }
     perror("readdir");
     closedir(dir);
 
 }
-void scanFunc(int argc, char* argv[]) {
+void use_scandir(int argc, char* argv[]) {
 struct dirent** names;
     int n;
     if(argc < 2)
@@ -70,6 +95,8 @@ struct dirent** names;
 
 }
 int main(int argc, char* argv[]){
+    //use_scandir(argc,argv);
     run_ls(argc, argv);
 }
+
 
