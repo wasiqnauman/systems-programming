@@ -26,7 +26,7 @@ void print_permissions(struct stat* info) {
     printf( (info->st_mode & S_IROTH) ? "r" : "-");
     printf( (info->st_mode & S_IWOTH) ? "w" : "-");
     printf( (info->st_mode & S_IXOTH) ? "x" : "-");
-    printf("\n\n");
+    printf("\n");
 }
 void print_info(char* name, char* args) {
     // -s size
@@ -36,26 +36,32 @@ void print_info(char* name, char* args) {
     // -m time & date of modication
     // -c time & date of creation
     struct stat* info = malloc(sizeof(struct stat));
+
+    // check if file does not exist
+   // if((stat(name, info)) == -1) {
+   //     fprintf(stderr, "stat: \"%s\"  %s\n", name, strerror(errno));
+   //     return;
+   // }
     stat(name, info);
-    printf("name: \t%s\n", name);
+    printf("name: \t\t%s\n", name);
 //    if(S_ISDIR(info->st_mode))
 //        printf("type: \tD\n");
     if(S_ISREG(info->st_mode))
-        printf("type: \tF\n");
+        printf("type: \t\tF\n");
     else
-        printf("type: \tD\n");
+        printf("type: \t\tD\n");
     if(!args) {
         return;
     }
     if(strchr(args, 's'))
-        printf("size: \t%d\n", info->st_size);
+        printf("size: \t\t%d\n", info->st_size);
     if(strchr(args, 'o')) {
         struct passwd* pw = getpwuid(info->st_uid);
         if(pw != 0)
-            printf("owner: \t%s\n", pw->pw_name);
+            printf("owner: \t\t%s\n", pw->pw_name);
     }
     if(strchr(args,'i'))
-        printf("inode: \t%d\n", info->st_ino);
+        printf("inode: \t\t%d\n", info->st_ino);
     if(strchr(args, 'p')) {
         print_permissions(info);
     }
@@ -69,8 +75,10 @@ void print_info(char* name, char* args) {
         tm = localtime(&info->st_ctimespec.tv_sec);
         printf("created: \t%d-%d-%d %d:%d:%d\n", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
     }
+    printf("\n");
 }
 int comp(const void* a, const void* b) {
+    // custom comparator object to compare two strings
     const char* pa = *(const char**)a;
     const char* pb = *(const char**)b;
     // printf("Comparing %s vs. %s for result %d\n", pa, pb, strcmp(pa,pb));
@@ -141,13 +149,13 @@ void myls(int argc, char* argv[]) {
             dir = opendir(names[i]);
             if(!dir) {
                 // check if the given names were of files and not directories
-                struct stat info;
-                if((stat(names[i], &info) == -1)) {
-                    perror("State\n");
-                    printf("File \"%s\" not found\n", names[i]);
-                    continue;    
-                }
-                else
+               // struct stat info;
+               // if((stat(names[i], &info) == -1)) {
+               //     perror("State\n");
+               //     printf("File \"%s\" not found\n", names[i]);
+               //     continue;    
+               // }
+               // else
                     print_info(names[i], args);
             }
             else
