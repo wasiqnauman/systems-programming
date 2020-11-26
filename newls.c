@@ -54,14 +54,14 @@ void print_info(char* name, char* args) {
         return;
     }
     if(strchr(args, 's'))
-        printf("size: \t\t%d\n", info->st_size);
+        printf("size: \t\t%d\n", (int)info->st_size);
     if(strchr(args, 'o')) {
         struct passwd* pw = getpwuid(info->st_uid);
         if(pw != 0)
             printf("owner: \t\t%s\n", pw->pw_name);
     }
     if(strchr(args,'i'))
-        printf("inode: \t\t%d\n", info->st_ino);
+        printf("inode: \t\t%d\n", (int)info->st_ino);
     if(strchr(args, 'p')) {
         print_permissions(info);
     }
@@ -149,13 +149,12 @@ void myls(int argc, char* argv[]) {
             dir = opendir(names[i]);
             if(!dir) {
                 // check if the given names were of files and not directories
-               // struct stat info;
-               // if((stat(names[i], &info) == -1)) {
-               //     perror("State\n");
-               //     printf("File \"%s\" not found\n", names[i]);
-               //     continue;    
-               // }
-               // else
+                struct stat info;
+                if((stat(names[i], &info) == -1)) {
+                    fprintf(stderr, "\"%s\": %s\n", names[i], strerror(errno));
+                    continue;    
+                }
+                else
                     print_info(names[i], args);
             }
             else
