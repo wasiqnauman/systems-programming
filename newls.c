@@ -73,7 +73,7 @@ void print_info(char* name, char* args) {
 int comp(const void* a, const void* b) {
     const char* pa = *(const char**)a;
     const char* pb = *(const char**)b;
-    printf("Comparing %s vs. %s for result %d\n", pa, pb, strcmp(pa,pb));
+    // printf("Comparing %s vs. %s for result %d\n", pa, pb, strcmp(pa,pb));
 
     return strcmp(pa,pb);
 }
@@ -140,10 +140,18 @@ void myls(int argc, char* argv[]) {
         for(int i=0; i<size; i++) {
             dir = opendir(names[i]);
             if(!dir) {
-                printf("File \"%s\" not found\n", names[i]);
-                continue;
+                // check if the given names were of files and not directories
+                struct stat info;
+                if((stat(names[i], &info) == -1)) {
+                    perror("State\n");
+                    printf("File \"%s\" not found\n", names[i]);
+                    continue;    
+                }
+                else
+                    print_info(names[i], args);
             }
-            read_info(dir, args);
+            else
+                read_info(dir, args);
             //dir was closed in read_info
         }
     }
