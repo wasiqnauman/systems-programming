@@ -45,7 +45,6 @@ int find(char* s) {
     // return: 1 if found, -1 if not found
     int idx = hash(s) % tablesize;
     if(t[idx] == NULL) {
-        printf("key does not exist\n");
         return -1;
     }
     int i;
@@ -83,6 +82,7 @@ void insert(char* k, char* v) {
         struct node* n = new_node(k,v);
         n->next = t[idx];
         t[idx] = n;
+        printf("alias \"%s\" mapped to \"%s\" added\n", k, v);
     }
 }
 void print_node(struct node* c) {
@@ -147,13 +147,31 @@ void remove_key(char* s) {
         ptr = ptr->next;
     }
 }
+struct node* get_node(char* key) {
+    // return NULL if key does not exist
+    if(find(key) == -1) {
+        return NULL;
+    }
+    int idx = hash(key) % tablesize;
+    struct node* ptr = t[idx];
+    struct node* item = NULL;
+    while(ptr != NULL) {
+        if(strcmp(ptr->key, key) == 0) {
+            item = ptr;
+            break;
+        }
+        ptr = ptr->next;
+    }
+    return item;
+}
+
 void print_array(char ** args, int i) {
     // @param: char** args - array to be printed
     //         int i - index to start printing from
     // print the array from the ith index till the end
 
     for(i; args[i] != NULL; i++) {
-        printf("%s ", args[i]);
+        printf("\'%s\' ", args[i]);
     }
     //print newline after printing the array
     printf("\n");
@@ -207,6 +225,42 @@ char** parse_commands(char *line) {
 
     return argv;
 }
+char** parse_alias(char *line) {
+    // DIFFERENT THAN parse_commands: parse_commands has a different delimiter
+    // split the string entered by user into a array of commands seperated by space
+    // @param: string entered by user
+    // return: array of commands
+    //
+    int num = 0;  // number of elements in the array
+    int idx = 0;
+    char** argv = malloc(num*sizeof(char*));
+    char* token;
+
+    if(argv == NULL) {
+        fprintf(stderr, "Malloc error\n");
+        exit(1);
+    }
+
+    token = strtok(line, "=\n");
+    num++;
+    
+    while(token != NULL) {
+        argv = realloc(argv, sizeof(char*) * num);   // allocate new memory for each new token added
+        if(argv == NULL) {
+            fprintf(stderr, "Unable to realloc\n");
+            exit(1);
+        }
+        // insert token into the argv array
+        argv[idx++] = token;
+        token = strtok(NULL, "=\n");
+        num++;
+    }
+    // set the last element of the array as NULL (required for execvp())
+    argv = realloc(argv, sizeof(char*) * num);
+    argv[idx] = NULL;
+
+    return argv;
+}
 
 int check_exit(char** args) {
     // check if the user has entered "exit" into the command line
@@ -219,19 +273,64 @@ int check_exit(char** args) {
     else
         return 0;
 }
+char* get_command(char** args) {
+    char* cmd = malloc(sizeof(char[STR_LEN]));
+    int i = 1;
+    while(args[i] != NULL) {
+        strcat(cmd, args[i]);
+        if(args[i+1] != NULL)
+            strcat(cmd, " ");
+        i++;
+    }
+    return cmd;
+}
 void handle_alias(char** args) {
     if(args[1] == NULL) {
         printf("Usage:\n");
         printf("alias -p   \"display the list of currently saved aliases\"\n");
-        printf("alias <alias_name>=<command>    \"To store a new alias\"\n");
+        printf("alias <alias_name> = <command>    \"To store a new alias\"\n");
         return;
     }
+    // if alias -p then display all previosly stored aliases
     if(strcmp(args[1], "-p")== 0) {
         print_table();
         return;
     }
-
+    //args[1] will contain the alias command, we need to split it before and after the '=' sign
+    char* command = get_command(args);
+    char* key = strdup(strtok(command,"=\n"));
+    char* value = strdup(strtok(NULL, "=\n"));
+    printf("value: %s\n", value);
+    insert(key, value);
+    free(key);
+    free(value);
+    free(command);
 }
+
+void run_alias(char** args) {
+    char* key = strdup(args[0]);
+    // get the node containing the alias
+    struct node* c = get_node(key);
+    char* val = strdup(c->val);
+    printf("val: %s\n", val);
+    char** cmd = parse_commands(val);
+    print_array(cmd, 0);
+    pid_t p;
+    int s;
+    p = fork();
+    if(p<0) {
+        perror("fork\n");
+        exit(1);
+    }
+    if(p==0) {
+        printf("cmd:%s\n", cmd[0]);
+        execvp(cmd[0], cmd);
+        fprintf(stderr, "Unable to run alias: %s\n", strerror(errno));
+    }
+    wait(&s);
+}
+
+
 void run_commands(char** args) {
     // runs the commands entered by the user into the shell
     // @param: array of arguments
@@ -250,7 +349,11 @@ void run_commands(char** args) {
         handle_alias(args);
         return;
     }
-    
+    // check if an alias was entered
+    if(find(args[0]) == 1) {
+        run_alias(args);
+        return;
+    }
     // run the commands on a new process
     p = fork();
     if(p < 0) {
