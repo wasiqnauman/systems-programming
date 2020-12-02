@@ -114,6 +114,11 @@ void print_table() {
             curr = curr->next;
         }
     }
+    
+    if(num == 1) {
+        // if num remains unchanged meaning there are no currently set aliases
+        printf("No aliases currently set\n");
+    }
 }
 void remove_key(char* s) {
     int idx = hash(s) % tablesize;
@@ -231,6 +236,10 @@ void print_vars() {
             ptr = ptr->next;
         }
     }
+    if(num==1) {
+        // if num remains unchanged meaning there are no set shellv
+        printf("No shell variables currently set\n");
+    }
 }
 struct node* get_var(char* k) {
     int idx = hash(k) % tablesize;
@@ -292,7 +301,7 @@ char* edit(char* line) {
             // we will increment var so we get the word after the $ symbol
             var = strchr(words[i], '$');
             var++;
-            printf("Variable:%s\n", var);
+           // printf("Variable:%s\n", var);
             if(find_var(var) == 0) {
                 fprintf(stderr, "Shell variable being used is not set\n");
                 return NULL;
@@ -515,7 +524,7 @@ void add_shellv(char** args) {
     char* command = arr_to_str(args);
     char* key = strdup(strtok(command,"=\n"));
     char* value = strdup(strtok(NULL, "=\n"));
-    printf("key:%s\nvalue:%s\n",key, value);
+    //printf("key:%s\nvalue:%s\n",key, value);
     if(strchr(key, '$')) {
         printf("Cannot use $ while setting shell variable\n");
         return;
