@@ -3,10 +3,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/wait.h>
 
-#define STR_LEN 100
+#define STR_LEN 1000
 #define MAX_ARGS 100
-#define tablesize 1000
+#define tablesize 10000
 extern int errno;
 
 struct node {
@@ -31,9 +32,11 @@ struct node* new_node(char *k, char* v) {
     n->next = NULL;
     return n;
 }
-void init_table() {
+void __init__() {
+    // initialize the hashtables for alias and shell variables
     for(int i=0; i<tablesize; i++) {
         t[i] = NULL;
+        shellv[i] = NULL;
     }
 }
 
@@ -102,9 +105,11 @@ void print_table() {
         printf("table does not exist!\n");
         exit(1);
     }
+    int num = 1;
     for(int i=0;i<tablesize; i++) {
         struct node* curr = t[i];
         while(curr != NULL) {
+            printf("%d. ", num++);
             print_node(curr);
             curr = curr->next;
         }
@@ -176,7 +181,7 @@ void print_array(char ** args, int i) {
     // print the array from the ith index till the end
 
     for(i; args[i] != NULL; i++) {
-        printf("\'%s\' ", args[i]);
+        printf("%s ", args[i]);
     }
     //print newline after printing the array
     printf("\n");
@@ -203,6 +208,7 @@ int find_var(char* key) {
 void insert_var(char* key, char* val) {
     if(find_var(key)) {
         printf("Var \"%s\" already exists!\n", key);
+        return;
     }
     int idx = hash(key) % tablesize;
     struct node* n = (struct node*)malloc(sizeof(struct node));
@@ -213,12 +219,14 @@ void insert_var(char* key, char* val) {
     printf("Var \"%s\" added successfully\n", key);
 }
 void print_var(struct node* n) {
-    printf("%s: %s\n", n->key, n->val);
+    printf("%s=%s\n", n->key, n->val);
 }
 void print_vars() {
+    int num = 1;
     for(int i=0; i<tablesize; i++) {
         struct node* ptr = shellv[i];
         while(ptr != NULL) {
+            printf("%d: ", num++);
             print_var(ptr);
             ptr = ptr->next;
         }
@@ -240,17 +248,23 @@ struct node* get_var(char* k) {
     return NULL;
 }
 char* edit(char* line) {
+    // @param: line containing the shell variable
+    // return: line with the shell variable replaced
+    // This functions looks up the shell variable starting with $ and replaces it with its value in the hashtable
+
     int num = 0;  // number of elements in the array
     int idx = 0;
     char** words = malloc(num*sizeof(char*));
     char* token;
-
+    char* buf = strdup(line);
+    //if memory allocation failed
     if(words == NULL) {
         fprintf(stderr, "Malloc error\n");
         exit(1);
     }
-
-    token = strtok(line, " \n");
+    
+    //split the input line into an array of strings
+    token = strtok(buf, " \n");
     num++;
 
     while(token != NULL) {
@@ -264,45 +278,54 @@ char* edit(char* line) {
         token = strtok(NULL, " \n");
         num++;
     }
-    // set the last element of the array as NULL (required for execvp())
-//    words = realloc(words, sizeof(char*) * num);
-//    words[idx] = "\0";
-//    struct node* c = get_var("$test");
-//    int index = hash(words[2]) % tablesize;
-//
-//    words[2] = strdup(shellv[index]->val);
-//    index = hash(words[0]) % tablesize;
-//    printf("%d\n", find_var(words[0]));
-//    words[0] = strdup(shellv[index]->val);
+
+    //replace the $shellv with its value in the shellv[] hashtable (if any)
     int total_length = 0;
+    char* var;
     for(int i=0; i<idx; i++) {
+
+        // check if the current word is the $shell_variable
         if(strchr(words[i], '$')) {
-            printf("%d: %s changed to ", i, words[i]);
-            if(find_var(words[i]) == 0) {
-                fprintf(stderr, "Shell variable being used is not set, exiting!\n");
-                exit(1);
+
+            // check if the $shell_variable has been set
+            // var will contain the word starting from $ symbol
+            // we will increment var so we get the word after the $ symbol
+            var = strchr(words[i], '$');
+            var++;
+            printf("Variable:%s\n", var);
+            if(find_var(var) == 0) {
+                fprintf(stderr, "Shell variable being used is not set\n");
+                return NULL;
             }
-            struct node* n = get_var(words[i]);
-            int index = hash(words[i]) %tablesize;
+
+            // get the value of $shell_variable
+            //struct node* n = get_var(words[i]);
+            
+            struct node*n = get_var(var);
+//            int index = hash(words[i]) %tablesize;
 //            words[i] = strdup(shellv[index]->val);
-            words[i] = strdup(n->val);
-            printf("%s\n", words[i]);
+
+//          // replace the $shell_variable with its set value
+            words[i] = strdup(n->val);        
         }
 
         total_length += strlen(words[i]);
 //        printf("%d:%s ",i, words[i]);
     }
     total_length++;
-    for(int i=0; i<idx; i++) {
-        printf("%d:%s ",i, words[i]);
-    }
+    //for(int i=0; i<idx; i++) {
+    //    printf("%d:%s\n",i, words[i]);
+    //}
+    //printf("\n");
+
+    // combine the array of words into a single string
     // allocate memory for the joined string
-    char* res = malloc(total_length);
+    char* res = malloc(sizeof(char[STR_LEN]));
     // mark string as empty, so we can copy to it
     res[0] = '\0';
     int len;
     for(int i=0; i<idx; i++) {
-        printf("adding %s to string\n", words[i]);
+       // printf("adding %s to string\n", words[i]);
         strcat(res, words[i]);
         // add space after each word unless its the last word;
         if(words[i+1] != NULL)
@@ -310,11 +333,7 @@ char* edit(char* line) {
         if(words[i+1] == NULL)
             strcat(res, "\0");
     }
-//    for(int i=0; i<strlen(res); i++) {
-//        printf("%c ", res[i]);
-//    }
-//
-    printf("res:%s, len: %d\n", res, strlen(res));
+
     return res;
 }
 
@@ -336,6 +355,8 @@ char** parse_commands(char *line) {
     // @param: string entered by user
     // return: array of commands
     //
+    //since strtok will modify the original string which we dont want, we create a buffer and pass it to strtok
+    char* buf = strdup(line);
     int num = 0;  // number of elements in the array
     int idx = 0;
     char** argv = malloc(num*sizeof(char*));
@@ -346,7 +367,7 @@ char** parse_commands(char *line) {
         exit(1);
     }
 
-    token = strtok(line, " \n");
+    token = strtok(buf, " \n");
     num++;
     
     while(token != NULL) {
@@ -414,7 +435,7 @@ int check_exit(char** args) {
     else
         return 0;
 }
-char* get_command(char** args) {
+char* arr_to_str(char** args) {
     char* cmd = malloc(sizeof(char[STR_LEN]));
     int i = 1;
     while(args[i] != NULL) {
@@ -426,22 +447,24 @@ char* get_command(char** args) {
     return cmd;
 }
 void handle_alias(char** args) {
+    // if an alias command has been entered, this function handles it
     if(args[1] == NULL) {
         printf("Usage:\n");
-        printf("alias -p   \"display the list of currently saved aliases\"\n");
-        printf("alias <alias_name> = <command>    \"To store a new alias\"\n");
+        printf("alias \t-p \t\t\t\"display the list of currently saved aliases\"\n");
+        printf("alias \t<alias_name>=<command>  \"To store a new alias\"\n");
         return;
     }
     // if alias -p then display all previosly stored aliases
     if(strcmp(args[1], "-p")== 0) {
+        printf("List of currently saved aliases:\n");
         print_table();
         return;
     }
     //args[1] will contain the alias command, we need to split it before and after the '=' sign
-    char* command = get_command(args);
+    char* command = arr_to_str(args);
     char* key = strdup(strtok(command,"=\n"));
     char* value = strdup(strtok(NULL, "=\n"));
-    printf("value: %s\n", value);
+   // printf("value: %s\n", value);
     insert(key, value);
     free(key);
     free(value);
@@ -449,6 +472,7 @@ void handle_alias(char** args) {
 }
 
 void run_alias(char** args) {
+    // if an alias has been used, this function runs it
     char* key = strdup(args[0]);
     // get the node containing the alias
     struct node* c = get_node(key);
@@ -472,22 +496,30 @@ void run_alias(char** args) {
 }
 
 void add_shellv(char** args) {
+    // this function adds a shell variable to the hashtable
+
+
     if(args[1] == NULL) {
         printf("Usage:\n");
-        printf("set -l   \"display the list of currently saved shell variables\"\n");
-        printf("set <var_name>=<val>    \"To store a new shell variable\"\n");
+        printf("set \t-l \t\t\t\"display the list of currently saved shell variables\"\n");
+        printf("set \t<var_name>=<val> \t\"To store a new shell variable\"\n");
         return;
     }
     // if alias -l then list all previosly stored shell variables
     if(strcmp(args[1], "-l")== 0) {
+        printf("List of currently set shell variables:\n");
         print_vars();
         return;
     }
-    //args[1] will contain the alias command, we need to split it before and after the '=' sign
-    char* command = get_command(args);
+    //args[1] will contain the variable assignment, we need to split it before and after the '=' sign
+    char* command = arr_to_str(args);
     char* key = strdup(strtok(command,"=\n"));
     char* value = strdup(strtok(NULL, "=\n"));
-    printf("value: %s\n", value);
+    printf("key:%s\nvalue:%s\n",key, value);
+    if(strchr(key, '$')) {
+        printf("Cannot use $ while setting shell variable\n");
+        return;
+    }
     insert_var(key, value);
     free(key);
     free(value);
@@ -503,8 +535,11 @@ void run_commands(char** args) {
     pid_t p;
     int status;
 
+    //args[0] contains the commands that are entered into the shell
+
     //check if a shell variable is being set
     if(strcmp(args[0], "set") == 0) {
+       // printf("set command detected\n");
         add_shellv(args);
         return;
     }
@@ -538,19 +573,34 @@ void run_commands(char** args) {
     wait(&status);   // wait for the child process to exit
 }
 int check_shellv(char* line) {
+    //printf("line:%s\n", line);
     char** commands = parse_commands(line);
     int i=0;
+    int set = 0;
+   
     // if a shell variable is being set, dont look for it yet
-    while(commands[i] != NULL) {
-        if(strcmp(commands[i], "set"))
-            return 0;
-        i++;
-    }
-    // if a shell variable is being used without the set command
-    if(strchr(line,'$'))
-        return 1;
-    else
-        return 0;
+   while(commands[i] != NULL) {
+       if(strcmp(commands[i], "set")==0) {
+           // set command is being to set a shell variable
+           set = 1;
+           break;
+       }
+       i++;
+   }
+   // return true only if a shell variable is being used without the set command
+   if(set == 0 && strchr(line,'$')) {
+        // printf("shellv being used without set command\n");
+       return 1;
+   }
+   else if(set == 1 && strchr(line, '$')) {
+       // printf("shellv being used with the set command\n");
+       // this will be handled in add_shellv();
+       return 0;
+   }
+   else {
+      //  printf("shellv not being used at all\n");
+       return 0;
+   }
 }
 void user_loop() {
     // get the current working directory of the user
@@ -558,6 +608,7 @@ void user_loop() {
     if(getcwd(cwd, sizeof(cwd))==NULL) {
         perror("CWD\n");
     }
+
     while(1) {
         printf("%s>", cwd);
         char** args;
@@ -565,8 +616,13 @@ void user_loop() {
         //check if any shell variables are being used
         if(check_shellv(line))
         {
+           // printf("shellv found, handling it...\n");
             // replace shell variables with their values and parse the commands
             char* new_line = edit(line);
+
+            // edit(line) would return null if a $ was used while setting shell variable
+            if(new_line == NULL)
+                continue;
             args = parse_commands(new_line);
         }
         // otherwise use the normal line if no shell variables
@@ -579,10 +635,12 @@ void user_loop() {
         // check if the user has signaled to exit
         if(check_exit(args) == 1)
             break;
+
         run_commands(args);  
     }
 }
 int main() {
+    __init__();
     user_loop();
    // for(int i=0; i<tablesize; i++) {
    //     shellv[i] = NULL;
