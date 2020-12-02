@@ -43,7 +43,7 @@ void __init__() {
 unsigned int hash(char* s) {
     unsigned int hash = 5381;
     int c;
-    while(c = *s++) {
+    while((c = *s++)) {
         hash = ((hash<<5) + hash) + c;
     }
     return hash;
@@ -101,7 +101,7 @@ void print_node(struct node* c) {
     printf("alias %s=\'%s\'\n", c->key, c->val);
 }
 void print_table() {
-    if(!t) {
+    if(t==NULL) {
         printf("table does not exist!\n");
         exit(1);
     }
@@ -175,12 +175,12 @@ struct node* get_node(char* key) {
     return item;
 }
 
-void print_array(char ** args, int i) {
+void print_array(char ** args, int start) {
     // @param: char** args - array to be printed
     //         int i - index to start printing from
     // print the array from the ith index till the end
-
-    for(i; args[i] != NULL; i++) {
+    
+    for(int i=start; args[i] != NULL; i++) {
         printf("%s ", args[i]);
     }
     //print newline after printing the array
