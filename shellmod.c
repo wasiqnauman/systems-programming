@@ -101,10 +101,7 @@ void print_node(struct node* c) {
     printf("alias %s=\'%s\'\n", c->key, c->val);
 }
 void print_table() {
-    if(t==NULL) {
-        printf("table does not exist!\n");
-        exit(1);
-    }
+
     int num = 1;
     for(int i=0;i<tablesize; i++) {
         struct node* curr = t[i];
@@ -486,9 +483,9 @@ void run_alias(char** args) {
     // get the node containing the alias
     struct node* c = get_node(key);
     char* val = strdup(c->val);
-    printf("val: %s\n", val);
+    //printf("val: %s\n", val);
     char** cmd = parse_commands(val);
-    print_array(cmd, 0);
+    
     pid_t p;
     int s;
     p = fork();
@@ -497,7 +494,7 @@ void run_alias(char** args) {
         exit(1);
     }
     if(p==0) {
-        printf("cmd:%s\n", cmd[0]);
+        //printf("cmd:%s\n", cmd[0]);
         execvp(cmd[0], cmd);
         fprintf(stderr, "Unable to run alias: %s\n", strerror(errno));
     }
