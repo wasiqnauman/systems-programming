@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #define STR_LEN 1000
 #define MAX_ARGS 100
@@ -183,7 +185,7 @@ void print_array(char ** args, int start) {
     // print the array from the ith index till the end
     
     for(int i=start; args[i] != NULL; i++) {
-        printf("%s ", args[i]);
+        printf("\"%s\"", args[i]);
     }
     //print newline after printing the array
     printf("\n");
@@ -533,7 +535,7 @@ void add_shellv(char** args) {
 
 
 }
-void run_commands(char** args) {
+void run_commands(char** args, char* infile, char* outfile) {
     // runs the commands entered by the user into the shell
     // @param: array of arguments
     // return: nothing
@@ -564,19 +566,62 @@ void run_commands(char** args) {
         run_alias(args);
         return;
     }
-    // run the commands on a new process
-    p = fork();
-    if(p < 0) {
-        perror("fork\n");
-        exit(1);
+
+    int tmpin=dup(0);
+    int tmpout=dup(1);
+    int fdin;
+    int fdout;
+    int ret;
+
+    if(infile) {
+        fdin = open(infile, O_RDONLY);
+        if(fdin == -1) {
+            perror("fdin");
+            exit(1);
+        }
     }
-    if(p == 0) {
-        //child process
-        // run the commands in the child process
-        execvp(args[0],args);
-        fprintf(stderr, "Unable to run command\n");
+    else {
+        fdin = dup(tmpin);
     }
-    wait(&status);   // wait for the child process to exit
+
+    for(int i=0; args[i] != NULL; i++) {
+        dup2(fdin, 0);
+        close(fdin);
+        if (args[i+1] == NULL) {
+            if(outfile) {
+                fdout = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if(fdout == -1) {
+                    perror("fdout");
+                    exit(1);
+                }
+            }
+            else
+                fdout = dup(tmpout);
+        } else {
+            int fdpipe[2];
+            pipe(fdpipe);
+            fdout = fdpipe[1];
+            fdin = fdpipe[0];
+        }
+        dup2(fdout, 1);
+        close(fdout);
+
+        p = fork();
+        if(p < 0) {
+            perror("fork");
+            exit(1);
+        }
+        if(p == 0) {
+            // child process;
+            execvp(args[i][0], args[i]);
+            perror("exec");
+            exit(1);
+        }
+    }
+    dup2(tmpin,0);
+    dup2(tmpout,1);
+    close(tmpin);
+    close(tmpout);
 }
 int check_shellv(char* line) {
     //printf("line:%s\n", line);
@@ -608,6 +653,95 @@ int check_shellv(char* line) {
        return 0;
    }
 }
+
+
+int check_redirect(char* line) {
+    int found = 0;
+    char** args = parse_commands(line);
+
+    int i=0;
+    while(args[i] != NULL) {
+        if(strchr(args[i],'<') || strchr(args[i], '>') || strchr(args[i],'|')) {
+            found = 1;
+            break;
+        }
+        i++;
+    }
+    return found;
+}
+
+void handle_redirect(char* line) {
+    char* infile;
+    char* outfile;
+    char* buf = malloc(sizeof(char[STR_LEN]));
+    char** cmds = malloc(sizeof(char*));
+    char** args = parse_commands(line);
+    int size = 0;
+    int i=0;
+    buf[0] = '\0';
+
+    while(args[i] != NULL) {
+
+        // check for input redirection
+        if(strchr(args[i], '<')) {
+            if(args[i+1] != NULL) {
+                // capture the name of input file
+                infile = strdup(args[i+1]);
+                printf("infile:%s\n", infile);
+                size++;
+                // add the command before the input redirection to the array of commands
+                cmds = realloc(cmds, sizeof(char*)*size);
+                cmds[size-1] = strdup(buf);
+                // clear the buffer string with the previous command
+                strcpy(buf, "");
+            }
+            else {
+                printf("invalid placement of input redirect operator\n");
+                exit(1);
+            }
+        }
+        if(strchr(args[i], '>')) {
+            if(args[i+1] != NULL) {
+                // capture name of output file
+                outfile = strdup(args[i+1]);
+                printf("outfile:%s\n", outfile);
+                size++;
+                cmds = realloc(cmds, sizeof(char*)*size);
+                printf("buf:%s\n", buf);
+                cmds[size-1] = strdup(buf);
+                strcpy(buf, "");
+                printf("buf:%s\n", buf);
+            }
+            else {
+                printf("invalid placement of output redirect operator\n");
+                exit(1);
+            }
+
+        }
+        if(strchr(args[i], '|')) {
+            if(args[i+1] != NULL) {
+                size++;
+                cmds = realloc(cmds, sizeof(char*)*size);
+                cmds[size-1] = strdup(buf);
+                strcpy(buf, "");
+            }
+            else {
+                printf("invalid placement of pipe operator\n");
+                exit(1);
+            }
+        }
+        else {
+        // add the command to a string
+        strcat(buf, args[i]);
+        if(args[i+1] != NULL)
+            strcat(buf, " ");
+        }
+        i++;
+    }
+
+    print_array(cmds, 0);
+    run_commands(cmds,infile,outfile);
+}
 void user_loop() {
     // get the current working directory of the user
     char cwd[STR_LEN];
@@ -619,6 +753,13 @@ void user_loop() {
         printf("%s>", cwd);
         char** args;
         char* line = read_line();
+
+        // check for redirect in commands
+        if(check_redirect(line)) {
+            printf("Redirect found\n");
+            handle_redirect(line);
+            continue;
+        }
         //check if any shell variables are being used
         if(check_shellv(line))
         {
